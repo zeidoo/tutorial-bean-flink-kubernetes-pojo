@@ -1,6 +1,6 @@
 # What
 
-This demo project shows how to pass POJOs around Apache Beam's DoFns. Furthermore, it shows how to run the pipeline on
+This demo project shows how to pass PoJos around Apache Beam's DoFns. Furthermore, it shows how to run the pipeline on
 Apache Flink running on a Kubernetes cluster.
 
 In this project we're building a super advanced AI powered historian that receives one of the many genocide events
@@ -15,7 +15,7 @@ surveillance and the elimination of human rights. It wouldn't be the first time 
 
 1. We're going to read a file containing a list of genocides, one on each line.
 1. Each genocide will go through 3 DoFns that will populate a `Genocide` PoJo.
-    * The first DoFn will the event field.
+    * The first DoFn will populate the event field.
     * The second DoFn will fill the perpetrators, and the active years. To make things interesting, the active years
       properties will he held in a protobuf message.
     * The third DoFn will just output the pojo to stdout.
@@ -42,7 +42,7 @@ surveillance and the elimination of human rights. It wouldn't be the first time 
   executing: `mvn compile exec:java -Dexec.mainClass=org.aihistorian.Pipeline -Dexec.args=--runner=FlinkRunner` in the
   project's root folder.
 
-# How to Beam with Flink on Kubernetes
+# How (Beam with Flink on Kubernetes)
 
 * Flink (1.12) has native integration with Kubernetes, see links below.
 * First we need to create a docker image containing with Flink and our Beam fat jar (all dependencies included).
@@ -86,7 +86,7 @@ surveillance and the elimination of human rights. It wouldn't be the first time 
       etc
         ```
     * Notice the sleep 10 minutes at the end of the Pipeline main method. Because this is a bounded source, the
-      kubernetes deployment and associated pods will be deleted once the job is completed and we won see the output.
+      kubernetes deployment and associated pods will be deleted once the job is completed and we won't see the output.
     * You can inspect the creation of the pods with `kubectrl get pods`
         ```
         kubectl get pods
