@@ -28,6 +28,9 @@ surveillance and the elimination of human rights. It wouldn't be the first time 
 
 # How (using PoJos between DoFns)
 
+* Important note from the Beam mailgroup: Serializable has several disadvantages (e.g. non-deterministic coding for key
+  grouping, less efficient serialization),
+  see  https://beam.apache.org/documentation/programming-guide/#inferring-schemas
 * Beam can run its transforms on different nodes/processes. It must therefore serialize the inputs and outputs of DoFns.
 * In order to do that, you can create
   a [Coder](https://beam.apache.org/releases/javadoc/2.0.0/org/apache/beam/sdk/coders/Coder.html)  for your PoJo, but
@@ -42,9 +45,8 @@ surveillance and the elimination of human rights. It wouldn't be the first time 
   executing: `mvn compile exec:java -Dexec.mainClass=org.aihistorian.Pipeline -Dexec.args=--runner=FlinkRunner` in the
   project's root folder.
 
-# How (Beam with Flink on Kubernetes)
+# Docker image, le fat jar way (maven-shade-plugin)
 
-* Flink (1.12) has native integration with Kubernetes, see links below.
 * First we need to create a docker image containing with Flink and our Beam fat jar (all dependencies included).
 * We can build this image by starting from a blank java image such as OpenJDK docker image, then installing maven,
   copying the source code and executing the compilation.
@@ -53,7 +55,7 @@ surveillance and the elimination of human rights. It wouldn't be the first time 
 * To build the fat jar with all the required Beam dependencies, we use the `maven-shade-plugin` (see pom.xml) file.
     * uncomment the `var filePath = "file:///opt/flink/usrlib/genocides.txt";` file in Pipeline.java and comment the
       previous one
-    * `mvn clean compile package` in the root directory will create
+    * `mvn -Pshaded clean compile package` in the root directory will create
       the `tutorial-beam-flink-kubernetes-pojo-bundled-1.0-SNAPSHOT.jar`
 * Then in our Dockerfile:
     * We copy the fat
@@ -61,6 +63,25 @@ surveillance and the elimination of human rights. It wouldn't be the first time 
     * We also need to copy our txt file `COPY genocides.txt $FLINK_HOME/usrlib/genocides.txt`
     * We build the image `docker build -t localhost:5000/aihistorian .`
     * We push the image `docker push localhost:5000/aihistorian`
+
+# Docker image, le slim jar way (jib-maven-plugin)
+
+* We can use Google's Jib plugin to create a slim jar. I recommend you
+  read [this article](https://phauer.com/2019/no-fat-jar-in-docker-image/) on why this is a good idea. There are a few
+  caveats.
+* Flink expects all the jar and dependencies to be in `/opt/flink/lib/`. Jib puts everything in `/app`. We can change
+  this behavior using ` <appRoot>/opt/flink/lib/app</appRoot>`. Now our code and all the dependencies will be in the
+  java classpath Flink starts with. Note that I did try the -C (--classpath) parameter to the Flink CLI, it didn't work
+  for me.
+* Jib normally does not package your code into a jar. Instead, it uses the -cp parameter to give java the entry point,
+  eg: ` -cp, /opt/flink/lib/app/classpath/*:/opt/flink/lib/app/libs/*, org.aihistorian.Pipeline`. Flink expects a jar.
+  Adding `<packaging>jar</packaging>` to our pom will make them both happy.
+* `mvn -Pjib clean compile package` in the root directory will create the docker image and push it to your private
+  registry.
+
+# How (Beam with Flink on Kubernetes)
+
+* Flink (1.12) has native integration with Kubernetes, see links below.
 * Now we need to execute our code:
     * [Download Flink](https://www.apache.org/dyn/closer.lua/flink/flink-1.12.2/flink-1.12.2-bin-scala_2.12.tgz)
     * Extract the files `tar -zxf flink-1.12.2-bin-scala_2.11.tgz`
@@ -78,7 +99,7 @@ surveillance and the elimination of human rights. It wouldn't be the first time 
         -Dkubernetes.taskmanager.cpu=0.5 \
         -Dtaskmanager.numberOfTaskSlots=4 \
         -Dkubernetes.rest-service.exposed.type=NodePort \
-        local:///opt/flink/usrlib/app.jar \
+        local:///opt/flink/lib/app/classpath/tutorial-beam-flink-kubernetes-pojo-1.0-SNAPSHOT.jar\
         --runner=FlinkRunner
       // the above parameters are for Flink, if you need to pass in params to your app, pass them after your jar line
         --some-param \
@@ -123,8 +144,8 @@ We have successfully run a Beam application on Flink on Kubernetes. There are a 
 account before going to production. Namely:
 
 * Flink provides various execution modes, we only deployed using the Application Mode.
-* Fat jars might not be the best for reproducible builds.
-* The docker image for this sample project is 800MB, not too long ago, that was the size of an entire OS.
+* Fat jars might not be the best for reproducible builds. We have seen how to use Jib for our images.
+* The docker image for this sample project is around 800MB, not too long ago, that was the size of an entire OS.
 * The Kubernetes deployment is created using the Flink client (which has a kubectrol client embedded). The usual way of
   deploying apps to Kubernetes is either though manually written yaml files and kubectrl or using Helm charts. As such,
   I'm unsure how to do things like Persistent Volume Claims, working with secrets etc. I still have some reading to do.
