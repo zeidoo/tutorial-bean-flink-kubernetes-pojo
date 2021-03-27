@@ -119,7 +119,7 @@
                                 <image>localhost:5000/aihistorian:latest</image>
                             </to>
                             <container>
-                                <appRoot>/opt/flink/lib/app</appRoot>
+<!--                                <appRoot>/opt/flink/lib/app</appRoot>-->
                             </container>
                             <allowInsecureRegistries>true</allowInsecureRegistries>
                             <containerizingMode>packaged</containerizingMode>

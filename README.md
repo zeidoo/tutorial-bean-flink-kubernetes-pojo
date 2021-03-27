@@ -69,10 +69,19 @@ surveillance and the elimination of human rights. It wouldn't be the first time 
 * We can use Google's Jib plugin to create a slim jar. I recommend you
   read [this article](https://phauer.com/2019/no-fat-jar-in-docker-image/) on why this is a good idea. There are a few
   caveats.
-* Flink expects all the jar and dependencies to be in `/opt/flink/lib/`. Jib puts everything in `/app`. We can change
-  this behavior using ` <appRoot>/opt/flink/lib/app</appRoot>`. Now our code and all the dependencies will be in the
-  java classpath Flink starts with. Note that I did try the -C (--classpath) parameter to the Flink CLI, it didn't work
-  for me.
+* Flink expects all the jar and dependencies to be in `/opt/flink/lib/`. Jib puts everything in `/app`.
+
+    * We can change this behavior using ` <appRoot>/opt/flink/lib/app</appRoot>`. Now our code and all the dependencies
+      will be in the java classpath Flink starts with. However, sometimes this will cause conflicts between Flink's
+      dependencies and your app, for example when using Apache Beam.
+
+    * The other way, which I prefer, is using `kubernetes.container-start-command-template` arg. For example, setting it
+      to something like
+      this: `-Dkubernetes.container-start-command-template="%java% %classpath%:/app/libs/* %jvmmem% %jvmopts% %logging% %class% %args%"`
+      , where /app/libs/* is where jib puts our application's dependencies. This seems to play nice with Apache Beam's
+      dependencies.
+
+    * Note that I did try the -C (--classpath) parameter to the Flink CLI, it didn't work for me.
 * Jib normally does not package your code into a jar. Instead, it uses the -cp parameter to give java the entry point,
   eg: ` -cp, /opt/flink/lib/app/classpath/*:/opt/flink/lib/app/libs/*, org.aihistorian.Pipeline`. Flink expects a jar.
   Adding `<packaging>jar</packaging>` to our pom will make them both happy.
@@ -98,8 +107,9 @@ surveillance and the elimination of human rights. It wouldn't be the first time 
         -Dkubernetes.jobmanager.cpu=0.5 \
         -Dkubernetes.taskmanager.cpu=0.5 \
         -Dtaskmanager.numberOfTaskSlots=4 \
+        -Dkubernetes.container-start-command-template="%java% %classpath%:/app/libs/* %jvmmem% %jvmopts% %logging% %class% %args%"
         -Dkubernetes.rest-service.exposed.type=NodePort \
-        local:///opt/flink/lib/app/classpath/tutorial-beam-flink-kubernetes-pojo-1.0-SNAPSHOT.jar\
+        local:///app/classpath/tutorial-beam-flink-kubernetes-pojo-1.0-SNAPSHOT.jar\
         --runner=FlinkRunner
       // the above parameters are for Flink, if you need to pass in params to your app, pass them after your jar line
         --some-param \
